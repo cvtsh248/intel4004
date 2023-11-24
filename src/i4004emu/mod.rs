@@ -82,7 +82,7 @@ pub mod intel4004{
                         cycle += 2;
                     },
                     0x20 => {
-                        if self.rom[cycle as usize] & 0x1 == 0{
+                        if op & 0x1 == 0{
                             let next_op = self.rom[(cycle+1) as usize];
                             self.op_fim(u16::from_ne_bytes([op,next_op]));
                             cycle += 2;
@@ -91,14 +91,28 @@ pub mod intel4004{
                         }
                     },
                     0x30 => {
-                        self.op_fin(op);
-                        cycle += 1;
+                        if op & 0x1 == 0{
+                            self.op_fin(op);
+                            cycle += 1;
+                        } else {
+                            self.op_jin(op);
+                            cycle += 1;  
+                        }
                     },
                     0x40 => {
                         let next_op = self.rom[(cycle+1) as usize];
                         self.op_jun(u16::from_ne_bytes([op,next_op]));
+                        cycle += 2;
+                    },
+                    0x50 => {
+                        let next_op = self.rom[(cycle+1) as usize];
+                        self.op_jms(u16::from_ne_bytes([op,next_op]));
                         cycle += 1;
-                    }
+                    },
+                    0x60 => {
+                        self.op_inc(op);
+                        cycle += 1;
+                    },
                     _=>{panic!()}
                 };
 
@@ -135,7 +149,7 @@ pub mod intel4004{
             let words = instr.to_ne_bytes();
             let index_reg_pair = words[0] & 0xE;
 
-            self.ixr[index_reg_pair as usize] = words[1] & 0xF0;
+            self.ixr[index_reg_pair as usize] = (words[1] & 0xF0)>>4;
             self.ixr[(index_reg_pair+1) as usize] = words[1] & 0x0F;
 
 
@@ -144,7 +158,7 @@ pub mod intel4004{
         }
 
         pub fn op_fin(&mut self, instr: u8){
-            // ROM[<Address from index reg pair 0>] is added to index pair register number supplied
+            // ROM[<Address from index reg pair 0>] is copied to index pair register number supplied
             
             let index_reg_pair = instr & 0xE;
             let page_num = self.pc/255; 
@@ -153,14 +167,14 @@ pub mod intel4004{
             if self.pc % 255 == 0 && self.pc != 0{
                 let rom_addr: u16 = (page_num+1)*255 + ixr_val_u16;
 
-                self.ixr[index_reg_pair as usize] = self.rom[rom_addr as usize] & 0xF0;
+                self.ixr[index_reg_pair as usize] = (self.rom[rom_addr as usize] & 0xF0)>>4;
                 self.ixr[(index_reg_pair+1) as usize] = self.rom[rom_addr as usize] & 0x0F;
                 
             } else {
 
                 let rom_addr: u16 = page_num*255 + ixr_val_u16;
 
-                self.ixr[index_reg_pair as usize] = self.rom[rom_addr as usize] & 0xF0;
+                self.ixr[index_reg_pair as usize] = (self.rom[rom_addr as usize] & 0xF0)>>4;
                 self.ixr[(index_reg_pair+1) as usize] = self.rom[rom_addr as usize] & 0x0F;
             }
 
@@ -172,7 +186,7 @@ pub mod intel4004{
             // Jump indirect, to address stored in index registers
             let index_reg_pair = instr & 0xE;
             let page_num: u16 = self.pc/255;
-            let pc_out: u16 = (self.ixr[index_reg_pair as usize] & self.ixr[(index_reg_pair+1) as usize]).into();
+            let pc_out: u16 = ((self.ixr[index_reg_pair as usize])<<4 & self.ixr[(index_reg_pair+1) as usize]).into();
 
             if self.pc % 255 == 0{
                 self.pc = pc_out+(page_num+1)*255;
@@ -201,6 +215,15 @@ pub mod intel4004{
 
             self.pc = instr;
 
+        }
+
+        pub fn op_inc(&mut self, instr:u8){
+            let index_addr = instr & 0xF;
+            if self.ixr[index_addr as usize] < 15{
+                self.ixr[index_addr as usize] = self.ixr[index_addr as usize]+1;
+            } else {
+                self.ixr[index_addr as usize] = 0;
+            }
         }
 
     }
