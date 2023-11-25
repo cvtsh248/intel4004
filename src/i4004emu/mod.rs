@@ -72,9 +72,10 @@ pub mod intel4004{
 
             while cycle < max_cycle_count{
                 let op = self.rom[cycle as usize];
-                let op_instr_only = (self.rom[cycle as usize] & 0xF0)>>4;
+                // let op_instr_only = (self.rom[cycle as usize] & 0xF0)>>4;
+                // let op_last_four = self.rom[cycle as usize] & 0xF;
                 
-                match op_instr_only{
+                match (self.rom[cycle as usize] & 0xF0)>>4{
                     0x0 => {cycle += 1}, // NOP
                     0x1 => {
                         let next_op = self.rom[(cycle+1) as usize];
@@ -117,13 +118,89 @@ pub mod intel4004{
                         let next_op = self.rom[(cycle+1) as usize];
                         self.op_isz(u16::from_ne_bytes([op,next_op]));
                         cycle += 2;
+                    },
+                    0x8 => {
+                        self.op_add(op);
+                        cycle += 1;
+                    },
+                    0x9 => {
+                        self.op_sub(op);
+                        cycle += 1;
+                    },
+                    0xA => {
+                        self.op_ld(op);
+                        cycle += 1;
+                    },
+                    0xB => {
+                        self.op_xch(op);
+                        cycle += 1;
+                    },
+                    0xC => {
+                        self.op_bbl(op);
+                        cycle += 1;
+                    },
+                    0xD => {
+                        self.op_ldm(op);
+                        cycle += 1;
+                    },
+                    0xF => {
+                        match self.rom[cycle as usize] & 0xF{
+                            0x0 => {
+                                self.op_clb();
+                                cycle += 1;
+                            },
+                            0x1 => {
+                                self.op_clc();
+                                cycle += 1;
+                            },
+                            0x2 => {
+                                self.op_iac();
+                                cycle += 1;
+                            },
+                            0x3 => {
+                                self.op_cmc();
+                                cycle += 1;
+                            },
+                            0x4 => {
+                                self.op_cma();
+                                cycle += 1;
+                            },
+                            0x5 => {
+                                self.op_ral();
+                                cycle += 1;
+                            },
+                            0x6 => {
+                                self.op_rar();
+                                cycle += 1;
+                            },
+                            0x7 => {
+                                self.op_tcc();
+                                cycle += 1;
+                            },
+                            0x8 => {
+                                self.op_dac();
+                                cycle += 1;
+                            },
+                            0x9 => {
+                                self.op_tcs();
+                                cycle += 1;
+                            },
+                            0xA => {
+                                self.op_stc();
+                                cycle += 1;
+                            },
+                            0xB => {
+                                self.op_daa();
+                                cycle += 1;
+                            },
+                            0xC => {
+                                // KBP
+                            },
+                            _=>{panic!()}
+                        }
                     }
                     _=>{panic!()}
                 };
-
-                println!("{}",self.pc);
-
-                
             }
         }
 
@@ -258,6 +335,7 @@ pub mod intel4004{
 
             if result <= 15 {
                 self.acc = result;
+                self.carry = 0;
             } else {
                 self.acc = 0;
                 self.carry = 1;
@@ -275,9 +353,11 @@ pub mod intel4004{
 
             if result <= 15 && result > 0{
                 self.acc = result;
+                self.carry = 1;
             } else {
                 self.acc = 0;
-                self.carry = 1;
+                self.carry = 0;
+                
             }
 
             self.pc += 1;
@@ -300,6 +380,135 @@ pub mod intel4004{
 
             self.ixr[index_addr as usize] = acc_temp;
             self.acc = reg_temp;
+
+            self.pc += 1;
+        }
+
+        pub fn op_bbl(&mut self, instr: u8){
+            // Move down one level in the stack, dump pc in there and dump DDDD in accumulator
+            self.acc = instr & 0xF;
+            self.pc = self.stack[self.stack_ptr as usize];
+
+            if self.stack_ptr > 0{
+                self.stack_ptr -= 1;
+            } else {
+                self.stack_ptr = 0;
+            }
+            
+            self.pc += 1;
+        }
+
+        pub fn op_ldm(&mut self, instr: u8){
+            // Load DDDD into accumulator
+            self.acc = instr & 0xF;
+            self.pc += 1;
+        }
+
+        pub fn op_clb(&mut self){
+            // Clear accumulator and carry
+            self.acc = 0;
+            self.carry = 0;
+            self.pc += 1;
+        }
+
+        pub fn op_clc(&mut self){
+            // Clear carry
+            self.carry = 0;
+            self.pc += 1;
+        }
+
+        pub fn op_iac(&mut self){
+            // Increment accumulator
+            let result = self.acc + 1;
+
+            if result <= 15 {
+                self.acc = result;
+                self.carry = 0;
+            } else {
+                self.acc = 0;
+                self.carry = 1;
+            }
+
+            self.pc += 1;
+        }
+
+        pub fn op_cmc(&mut self){
+            // Complement carry
+            self.carry = !self.carry;
+            self.pc += 1;
+        }
+
+        pub fn op_cma(&mut self){
+            // Complement accumulator
+            self.acc = !self.acc;
+            self.pc += 1;
+        }
+
+        pub fn op_ral(&mut self){
+            // Rotate left 
+            let new_acc = (self.acc << 1 & 0xF) | self.carry;
+            self.carry = (self.acc & 0x8) >> 3;
+            self.acc = new_acc;
+
+            self.pc += 1;
+
+        }
+
+        pub fn op_rar(&mut self){
+            // Rotate right 
+            let new_acc = (self.acc >> 1 & 0xF) | self.carry;
+            self.carry = self.acc & 0x1;
+            self.acc = new_acc;
+
+            self.pc += 1;
+
+        }
+
+        pub fn op_tcc(&mut self){
+            // transfer carry to accumulator
+            self.acc = self.carry;
+            self.carry = 0;
+
+            self.pc += 1;
+        }
+
+        pub fn op_dac(&mut self){
+            // Decrement accumulator
+            let result = self.acc - 1;
+
+            if result <= 15{
+                self.acc = result;
+                self.carry = 1;
+            } else {
+                self.acc = 0;
+                self.carry = 0;
+            }
+
+            self.pc += 1;
+        }
+
+        pub fn op_tcs(&mut self){
+            if self.carry == 1{
+                self.acc = 0x9;
+            } else {
+                self.acc = 0xA;
+            }
+            self.carry = 0;
+            self.pc += 1;
+        }
+
+        pub fn op_stc(&mut self){
+            // Set carry to 1
+            self.carry = 1;
+            self.pc += 1;
+        }
+
+        pub fn op_daa(&mut self){
+            if (self.acc > 9 || self.carry == 1) && self.acc <= 15{
+                self.acc += 6;
+            } else if (self.acc > 9 || self.carry == 1) && self.acc > 15{
+                self.acc = 0;
+            }
 
             self.pc += 1;
         }

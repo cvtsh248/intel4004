@@ -19,11 +19,16 @@ fn main() {
     // cpu.rom[1] = 0b01100010;
     // cpu.ixr[0] = 0b00000101;
     // cpu.rom[5] = 0b11111111;
-    cpu.rom[0] = 0b00100010;
-    cpu.rom[1] = 0b00000101;
-    cpu.rom[5] = 0b11111111;
+    // cpu.rom[0] = 0b00100010;
+    // cpu.rom[1] = 0b00000101;
+    // cpu.rom[5] = 0b11111111;
+    cpu.rom[0] = 0x61;
+    cpu.rom[1] = 0xD5;
+    cpu.rom[2] = 0x81;
+    cpu.rom[3] = 0xB1;
+    cpu.rom[4] = 0x01;
 
-    cpu.execute(3);
+    cpu.execute(5);
     println!("{:?}",cpu.ixr);
 
 }
