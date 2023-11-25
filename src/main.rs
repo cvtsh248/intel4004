@@ -15,9 +15,12 @@ fn main() {
 
     };
 
-    cpu.rom[0] = 0b00110010;
-    cpu.rom[1] = 0b01100010;
-    cpu.ixr[0] = 0b00000101;
+    // cpu.rom[0] = 0b00110010;
+    // cpu.rom[1] = 0b01100010;
+    // cpu.ixr[0] = 0b00000101;
+    // cpu.rom[5] = 0b11111111;
+    cpu.rom[0] = 0b00100010;
+    cpu.rom[1] = 0b00000101;
     cpu.rom[5] = 0b11111111;
 
     cpu.execute(3);

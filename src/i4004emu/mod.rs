@@ -58,7 +58,7 @@ pub mod intel4004{
         pub pc: u16, // 12-bit program counter
         pub stack: [u16; 3], // Subroutine stack contains 3 layers, each should store a 12-bit address
         pub stack_ptr: u8, // 4-bit Stack pointer
-        pub acc: u8, // accumulator
+        pub acc: u8, // 4-bit accumulator
         pub carry: u8, // carry bit
         pub test: u8 // Test pin
         
@@ -72,16 +72,16 @@ pub mod intel4004{
 
             while cycle < max_cycle_count{
                 let op = self.rom[cycle as usize];
-                let op_instr_only = self.rom[cycle as usize] & 0xF0;
+                let op_instr_only = (self.rom[cycle as usize] & 0xF0)>>4;
                 
                 match op_instr_only{
                     0x0 => {cycle += 1}, // NOP
-                    0x10 => {
+                    0x1 => {
                         let next_op = self.rom[(cycle+1) as usize];
                         self.op_jcn(u16::from_ne_bytes([op, next_op]));
                         cycle += 2;
                     },
-                    0x20 => {
+                    0x2 => {
                         if op & 0x1 == 0{
                             let next_op = self.rom[(cycle+1) as usize];
                             self.op_fim(u16::from_ne_bytes([op,next_op]));
@@ -90,7 +90,7 @@ pub mod intel4004{
                             // SRC
                         }
                     },
-                    0x30 => {
+                    0x3 => {
                         if op & 0x1 == 0{
                             self.op_fin(op);
                             cycle += 1;
@@ -99,20 +99,25 @@ pub mod intel4004{
                             cycle += 1;  
                         }
                     },
-                    0x40 => {
+                    0x4 => {
                         let next_op = self.rom[(cycle+1) as usize];
                         self.op_jun(u16::from_ne_bytes([op,next_op]));
                         cycle += 2;
                     },
-                    0x50 => {
+                    0x5 => {
                         let next_op = self.rom[(cycle+1) as usize];
                         self.op_jms(u16::from_ne_bytes([op,next_op]));
-                        cycle += 1;
+                        cycle += 2;
                     },
-                    0x60 => {
+                    0x6 => {
                         self.op_inc(op);
                         cycle += 1;
                     },
+                    0x7 => {
+                        let next_op = self.rom[(cycle+1) as usize];
+                        self.op_isz(u16::from_ne_bytes([op,next_op]));
+                        cycle += 2;
+                    }
                     _=>{panic!()}
                 };
 
@@ -145,9 +150,10 @@ pub mod intel4004{
 
         pub fn op_fim(&mut self, instr: u16){
             // In the first word, the last three bytes (exluding the tailing 0) refers to the index register pair in which the data is to be stored
-            
             let words = instr.to_ne_bytes();
             let index_reg_pair = words[0] & 0xE;
+            
+            println!("{}",words[1]);
 
             self.ixr[index_reg_pair as usize] = (words[1] & 0xF0)>>4;
             self.ixr[(index_reg_pair+1) as usize] = words[1] & 0x0F;
@@ -205,6 +211,7 @@ pub mod intel4004{
         }
 
         pub fn op_jms(&mut self, instr:u16){
+            // Jump to subroutine ROM address, and save old address (PC) in the stack
             self.stack[self.stack_ptr as usize] = self.pc;
 
             if self.stack_ptr == 2 {
@@ -218,13 +225,71 @@ pub mod intel4004{
         }
 
         pub fn op_inc(&mut self, instr:u8){
+            // Increment register RRRR
             let index_addr = instr & 0xF;
             if self.ixr[index_addr as usize] < 15{
                 self.ixr[index_addr as usize] = self.ixr[index_addr as usize]+1;
             } else {
                 self.ixr[index_addr as usize] = 0;
             }
+
+            self.pc += 1;
         }
+
+        pub fn op_isz(&mut self, instr:u16){
+            // Increment register RRRR and jump to address supplied in ROM
+            let words = instr.to_ne_bytes();
+            let index_addr = words[0] & 0xF;
+
+            if self.ixr[index_addr as usize] < 15{
+                self.ixr[index_addr as usize] = self.ixr[index_addr as usize]+1;
+            } else {
+                self.ixr[index_addr as usize] = 0;
+            }
+
+            self.pc = words[1].into();
+        }
+
+        pub fn op_add(&mut self, instr:u8){
+            // Add value in register to accumulator with carry
+            let index_addr = instr & 0xF;
+
+            let result = self.acc + self.ixr[index_addr as usize];
+
+            if result <= 15 {
+                self.acc = result;
+            } else {
+                self.acc = 0;
+                self.carry = 1;
+            }
+
+            self.pc += 1;
+
+        }
+
+        pub fn op_sub(&mut self, instr:u8){
+            // Subtract value in register to accumulator with carry
+            let index_addr = instr & 0xF;
+
+            let result = self.acc - self.ixr[index_addr as usize];
+
+            if result <= 15 && result > 0{
+                self.acc = result;
+            } else {
+                self.acc = 0;
+                self.carry = 1;
+            }
+
+            self.pc += 1;
+
+        }
+
+        pub fn op_ld(&mut self, instr: u8){
+            // Load contents of register RRRR into accumulator
+            let index_addr = instr & 0xF;
+            self.acc = self.ixr[index_addr as usize];
+        }
+
 
     }
 
