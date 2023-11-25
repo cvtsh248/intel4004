@@ -55,6 +55,7 @@ pub mod intel4004{
         pub rom: [u8; 4096], // ROM consists of 4096 8-bit words (32768 bits total), 16 pages of 256 bits
         pub ram_d: [u8; 1024], // RAM Data "characters", consists of 1024 4-bit data "characters"
         pub ram_s: [u8; 256], // RAM Status "characters", consists of 256 4-bit status "characters"
+        pub ram_bank: u8, // RAM Bank
         pub pc: u16, // 12-bit program counter
         pub stack: [u16; 3], // Subroutine stack contains 3 layers, each should store a 12-bit address
         pub stack_ptr: u8, // 4-bit Stack pointer
@@ -194,7 +195,8 @@ pub mod intel4004{
                                 cycle += 1;
                             },
                             0xC => {
-                                // KBP
+                                self.op_kbp();
+                                cycle += 1;
                             },
                             _=>{panic!()}
                         }
@@ -204,7 +206,7 @@ pub mod intel4004{
             }
         }
 
-        pub fn op_jcn(&mut self, instr: u16){ // This is a 2 word instruction, hence u16 instead of u8
+        fn op_jcn(&mut self, instr: u16){ // This is a 2 word instruction, hence u16 instead of u8
             /*  
                 If c1 = 0, Do not invert jump condition
                 If c1 = 1, Invert jump condition
@@ -225,7 +227,7 @@ pub mod intel4004{
             }
         }
 
-        pub fn op_fim(&mut self, instr: u16){
+        fn op_fim(&mut self, instr: u16){
             // In the first word, the last three bytes (exluding the tailing 0) refers to the index register pair in which the data is to be stored
             let words = instr.to_ne_bytes();
             let index_reg_pair = words[0] & 0xE;
@@ -240,7 +242,7 @@ pub mod intel4004{
 
         }
 
-        pub fn op_fin(&mut self, instr: u8){
+        fn op_fin(&mut self, instr: u8){
             // ROM[<Address from index reg pair 0>] is copied to index pair register number supplied
             
             let index_reg_pair = instr & 0xE;
@@ -265,7 +267,7 @@ pub mod intel4004{
 
         }
 
-        pub fn op_jin(&mut self, instr: u8){
+        fn op_jin(&mut self, instr: u8){
             // Jump indirect, to address stored in index registers
             let index_reg_pair = instr & 0xE;
             let page_num: u16 = self.pc/255;
@@ -281,13 +283,13 @@ pub mod intel4004{
 
         }
 
-        pub fn op_jun(&mut self, instr: u16){
+        fn op_jun(&mut self, instr: u16){
             // Jump directly to rom address
             let address = instr & 0xFFF;
             self.pc = address;
         }
 
-        pub fn op_jms(&mut self, instr:u16){
+        fn op_jms(&mut self, instr:u16){
             // Jump to subroutine ROM address, and save old address (PC) in the stack
             self.stack[self.stack_ptr as usize] = self.pc;
 
@@ -301,7 +303,7 @@ pub mod intel4004{
 
         }
 
-        pub fn op_inc(&mut self, instr:u8){
+        fn op_inc(&mut self, instr:u8){
             // Increment register RRRR
             let index_addr = instr & 0xF;
             if self.ixr[index_addr as usize] < 15{
@@ -313,7 +315,7 @@ pub mod intel4004{
             self.pc += 1;
         }
 
-        pub fn op_isz(&mut self, instr:u16){
+        fn op_isz(&mut self, instr:u16){
             // Increment register RRRR and jump to address supplied in ROM
             let words = instr.to_ne_bytes();
             let index_addr = words[0] & 0xF;
@@ -327,7 +329,7 @@ pub mod intel4004{
             self.pc = words[1].into();
         }
 
-        pub fn op_add(&mut self, instr:u8){
+        fn op_add(&mut self, instr:u8){
             // Add value in register to accumulator with carry
             let index_addr = instr & 0xF;
 
@@ -345,7 +347,7 @@ pub mod intel4004{
 
         }
 
-        pub fn op_sub(&mut self, instr:u8){
+        fn op_sub(&mut self, instr:u8){
             // Subtract value in register to accumulator with carry
             let index_addr = instr & 0xF;
 
@@ -364,7 +366,7 @@ pub mod intel4004{
 
         }
 
-        pub fn op_ld(&mut self, instr: u8){
+        fn op_ld(&mut self, instr: u8){
             // Load contents of register RRRR into accumulator
             let index_addr = instr & 0xF;
             self.acc = self.ixr[index_addr as usize];
@@ -372,7 +374,7 @@ pub mod intel4004{
             self.pc += 1;
         }
 
-        pub fn op_xch(&mut self, instr: u8){
+        fn op_xch(&mut self, instr: u8){
             // Exchange contents of index register and accumulator
             let index_addr = instr & 0xF;
             let acc_temp = self.acc;
@@ -384,7 +386,7 @@ pub mod intel4004{
             self.pc += 1;
         }
 
-        pub fn op_bbl(&mut self, instr: u8){
+        fn op_bbl(&mut self, instr: u8){
             // Move down one level in the stack, dump pc in there and dump DDDD in accumulator
             self.acc = instr & 0xF;
             self.pc = self.stack[self.stack_ptr as usize];
@@ -398,26 +400,26 @@ pub mod intel4004{
             self.pc += 1;
         }
 
-        pub fn op_ldm(&mut self, instr: u8){
+        fn op_ldm(&mut self, instr: u8){
             // Load DDDD into accumulator
             self.acc = instr & 0xF;
             self.pc += 1;
         }
 
-        pub fn op_clb(&mut self){
+        fn op_clb(&mut self){
             // Clear accumulator and carry
             self.acc = 0;
             self.carry = 0;
             self.pc += 1;
         }
 
-        pub fn op_clc(&mut self){
+        fn op_clc(&mut self){
             // Clear carry
             self.carry = 0;
             self.pc += 1;
         }
 
-        pub fn op_iac(&mut self){
+        fn op_iac(&mut self){
             // Increment accumulator
             let result = self.acc + 1;
 
@@ -432,19 +434,19 @@ pub mod intel4004{
             self.pc += 1;
         }
 
-        pub fn op_cmc(&mut self){
+        fn op_cmc(&mut self){
             // Complement carry
             self.carry = !self.carry;
             self.pc += 1;
         }
 
-        pub fn op_cma(&mut self){
+        fn op_cma(&mut self){
             // Complement accumulator
             self.acc = !self.acc;
             self.pc += 1;
         }
 
-        pub fn op_ral(&mut self){
+        fn op_ral(&mut self){
             // Rotate left 
             let new_acc = (self.acc << 1 & 0xF) | self.carry;
             self.carry = (self.acc & 0x8) >> 3;
@@ -454,7 +456,7 @@ pub mod intel4004{
 
         }
 
-        pub fn op_rar(&mut self){
+        fn op_rar(&mut self){
             // Rotate right 
             let new_acc = (self.acc >> 1 & 0xF) | self.carry;
             self.carry = self.acc & 0x1;
@@ -464,7 +466,7 @@ pub mod intel4004{
 
         }
 
-        pub fn op_tcc(&mut self){
+        fn op_tcc(&mut self){
             // transfer carry to accumulator
             self.acc = self.carry;
             self.carry = 0;
@@ -472,7 +474,7 @@ pub mod intel4004{
             self.pc += 1;
         }
 
-        pub fn op_dac(&mut self){
+        fn op_dac(&mut self){
             // Decrement accumulator
             let result = self.acc - 1;
 
@@ -487,7 +489,7 @@ pub mod intel4004{
             self.pc += 1;
         }
 
-        pub fn op_tcs(&mut self){
+        fn op_tcs(&mut self){
             if self.carry == 1{
                 self.acc = 0x9;
             } else {
@@ -497,13 +499,13 @@ pub mod intel4004{
             self.pc += 1;
         }
 
-        pub fn op_stc(&mut self){
+        fn op_stc(&mut self){
             // Set carry to 1
             self.carry = 1;
             self.pc += 1;
         }
 
-        pub fn op_daa(&mut self){
+        fn op_daa(&mut self){
             if (self.acc > 9 || self.carry == 1) && self.acc <= 15{
                 self.acc += 6;
             } else if (self.acc > 9 || self.carry == 1) && self.acc > 15{
@@ -511,6 +513,29 @@ pub mod intel4004{
             }
 
             self.pc += 1;
+        }
+
+        fn op_kbp(&mut self){
+            match self.acc{
+                0x0 => {
+                    self.acc = 0x0;
+                },
+                0x1 => {
+                    self.acc = 0x1;
+                },
+                0x2 => {
+                    self.acc = 0x2;
+                },
+                0x4 => {
+                    self.acc = 0x3;
+                },
+                0x8 => {
+                    self.acc = 0x4;
+                },
+                _=>{
+                    self.acc = 0xF;
+                }
+            };
         }
 
 

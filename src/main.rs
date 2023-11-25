@@ -6,6 +6,7 @@ fn main() {
         rom: [0; 4096], 
         ram_d: [0; 1024], 
         ram_s: [0; 256],
+        ram_bank: 0,
         pc: 0, 
         stack: [0; 3], 
         stack_ptr: 0, 
