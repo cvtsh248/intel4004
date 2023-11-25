@@ -1,6 +1,6 @@
 // Technically this processor is big endian, but I'm sticking to little endian cause it makes no difference at the end of the day
 #[derive(Debug)]
-pub struct cpu{ // we only have u8, u16, u32, u64, u128 to work with so the closest match will have to do
+pub struct CPU{ // we only have u8, u16, u32, u64, u128 to work with so the closest match will have to do
     pub ixr: [u8; 16], // Index registers consist of 16 registers of 4 bits each
     pub rom: [u8; 4096], // ROM consists of 4096 8-bit words (32768 bits total), 16 pages of 256 bits
     pub ram_d: [u8; 1024], // RAM Data "characters", consists of 1024 4-bit data "characters"
@@ -15,7 +15,7 @@ pub struct cpu{ // we only have u8, u16, u32, u64, u128 to work with so the clos
     pub test: u8 // Test pin
     
 }
-impl cpu{
+impl CPU{
     pub fn execute(&mut self, max_cycle_count: i32){
         // Initialise
         self.pc = 0;
@@ -40,7 +40,8 @@ impl cpu{
                         self.op_fim(u16::from_ne_bytes([op,next_op]));
                         cycle += 2;
                     } else {
-                        // SRC
+                        self.op_src(op);
+                        cycle += 1;
                     }
                 },
                 0x3 => {

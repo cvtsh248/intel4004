@@ -4,7 +4,7 @@ mod i4004emu;
 mod fileio;
 
 fn main() {
-    let mut cpu: i4004emu::cpu = i4004emu::cpu{
+    let mut cpu: i4004emu::CPU = i4004emu::CPU{
         ixr: [0; 16], 
         rom: [0; 4096], 
         ram_d: [0; 1024], 
