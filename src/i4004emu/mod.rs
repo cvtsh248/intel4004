@@ -288,6 +288,20 @@ pub mod intel4004{
             // Load contents of register RRRR into accumulator
             let index_addr = instr & 0xF;
             self.acc = self.ixr[index_addr as usize];
+
+            self.pc += 1;
+        }
+
+        pub fn op_xch(&mut self, instr: u8){
+            // Exchange contents of index register and accumulator
+            let index_addr = instr & 0xF;
+            let acc_temp = self.acc;
+            let reg_temp = self.ixr[index_addr as usize];
+
+            self.ixr[index_addr as usize] = acc_temp;
+            self.acc = reg_temp;
+
+            self.pc += 1;
         }
 
 
