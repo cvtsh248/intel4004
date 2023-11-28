@@ -3,9 +3,11 @@
 pub struct CPU{ // we only have u8, u16, u32, u64, u128 to work with so the closest match will have to do
     pub ixr: [u8; 16], // Index registers consist of 16 registers of 4 bits each
     pub rom: [u8; 4096], // ROM consists of 4096 8-bit words (32768 bits total), 16 pages of 256 bits
+    pub rom_io: u8, // ROM IO line
     pub ram_d: [u8; 1024], // RAM Data "characters", consists of 1024 4-bit data "characters"
     pub ram_s: [u8; 256], // RAM Status "characters", consists of 256 4-bit status "characters"
-    pub ram_bank: u8, // RAM Bank
+    pub ram_o: [u8; 16], // RAM Output
+    pub ram_bank: u8, // RAM Bank selection (Each 4002 chip has 4 Banks, which have 4 chips, which have 4 "registers" of 16 bits)
     pub ram_addr: u8, // RAM Address register
     pub pc: u16, // 12-bit program counter
     pub stack: [u16; 3], // Subroutine stack contains 3 layers, each should store a 12-bit address
@@ -205,7 +207,7 @@ impl CPU{
         let page_num = self.pc/255; 
         let ixr_val_u16: u16 = self.ixr[0].into();
 
-        if self.pc % 255 == 0 && self.pc != 0{
+        if (self.pc-1) % 256 == 0 && self.pc != 0{
             let rom_addr: u16 = (page_num+1)*255 + ixr_val_u16;
 
             self.ixr[index_reg_pair as usize] = (self.rom[rom_addr as usize] & 0xF0)>>4;
@@ -495,19 +497,46 @@ impl CPU{
     }
 
     fn op_dcl(&mut self){
-        // todo
+        // Designate commandline (RAM banks), using the 3 least significant bits of the accumulator
+        self.ram_bank = self.acc & 0x7;
+        self.pc += 1;
+
     }
 
     fn op_src(&mut self, instr:u8){
-        // see data sheet
+        // Select RAM address
         let index_reg_pair = instr & 0xE;
-        self.ram_addr = self.ixr[index_reg_pair as usize] & (self.ixr[(index_reg_pair+1) as usize])<<4;
+        self.ram_addr = (self.ixr[index_reg_pair as usize])<<4 & self.ixr[(index_reg_pair+1) as usize];
         self.pc += 1;
     }
 
     fn op_wrm(&mut self){
+        // Write accumulator to ram address previously selected using src
         self.ram_d[self.ram_addr as usize] = self.acc;
         self.pc += 1;
+    }
+
+    fn op_wmp(&mut self){
+        // Write accumulator to previously selected ram output
+        self.ram_o[self.ram_bank as usize] = self.acc;
+        self.pc += 1;
+    }
+
+    fn op_wrr(&mut self){
+        // Write accumulator contents to previously selected rom io
+        self.rom_io = self.acc;
+        self.pc += 1;
+    }
+
+    fn op_wpm(&mut self){
+        // Todo at some point
+    }
+
+    fn op_wr0(&mut self){
+        // Write contents of accumulator to selected ram bank ram status character 0
+        //TODO WIP
+        self.ram_s[(self.ram_addr/16) as usize];
+
     }
 
 }
