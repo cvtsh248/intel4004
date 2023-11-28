@@ -6,7 +6,7 @@ pub struct CPU{ // we only have u8, u16, u32, u64, u128 to work with so the clos
     pub ram_d: [u8; 1024], // RAM Data "characters", consists of 1024 4-bit data "characters"
     pub ram_s: [u8; 256], // RAM Status "characters", consists of 256 4-bit status "characters"
     pub ram_bank: u8, // RAM Bank
-    pub ram_addr: u8, // RAM Address
+    pub ram_addr: u8, // RAM Address register
     pub pc: u16, // 12-bit program counter
     pub stack: [u16; 3], // Subroutine stack contains 3 layers, each should store a 12-bit address
     pub stack_ptr: u8, // 4-bit Stack pointer
@@ -499,7 +499,15 @@ impl CPU{
     }
 
     fn op_src(&mut self, instr:u8){
-        // todo
+        // see data sheet
+        let index_reg_pair = instr & 0xE;
+        self.ram_addr = self.ixr[index_reg_pair as usize] & (self.ixr[(index_reg_pair+1) as usize])<<4;
+        self.pc += 1;
+    }
+
+    fn op_wrm(&mut self){
+        self.ram_d[self.ram_addr as usize] = self.acc;
+        self.pc += 1;
     }
 
 }
