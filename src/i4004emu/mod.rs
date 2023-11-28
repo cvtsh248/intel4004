@@ -207,7 +207,7 @@ impl CPU{
         let page_num = self.pc/255; 
         let ixr_val_u16: u16 = self.ixr[0].into();
 
-        if (self.pc-1) % 256 == 0 && self.pc != 0{
+        if (self.pc+1) % 256 == 0 && self.pc != 0{
             let rom_addr: u16 = (page_num+1)*255 + ixr_val_u16;
 
             self.ixr[index_reg_pair as usize] = (self.rom[rom_addr as usize] & 0xF0)>>4;
@@ -532,11 +532,36 @@ impl CPU{
         // Todo at some point
     }
 
+
     fn op_wr0(&mut self){
         // Write contents of accumulator to selected ram bank ram status character 0
-        //TODO WIP
-        self.ram_s[(self.ram_addr/16) as usize];
+        // I need to check if this works
+        self.ram_s[(((self.ram_addr+1)/16)+0) as usize] = self.acc;
+        self.pc += 1;
 
     }
 
+    fn op_wr1(&mut self){
+        // Write contents of accumulator to selected ram bank ram status character 1
+        // I need to check if this works
+        self.ram_s[(((self.ram_addr+1)/16)+1) as usize] = self.acc;
+        self.pc += 1;
+
+    }
+
+    fn op_wr2(&mut self){
+        // Write contents of accumulator to selected ram bank ram status character 2
+        // I need to check if this works
+        self.ram_s[(((self.ram_addr+1)/16)+2) as usize] = self.acc;
+        self.pc += 1;
+
+    }
+
+    fn op_wr3(&mut self){
+        // Write contents of accumulator to selected ram bank ram status character 3
+        // I need to check if this works
+        self.ram_s[(((self.ram_addr+1)/16)+3) as usize] = self.acc;
+        self.pc += 1;
+
+    }
 }
