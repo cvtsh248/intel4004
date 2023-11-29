@@ -29,7 +29,7 @@ impl CPU{
             let op = self.rom[cycle as usize];
             // let op_instr_only = (self.rom[cycle as usize] & 0xF0)>>4;
             // let op_last_four = self.rom[cycle as usize] & 0xF;
-            println!("{:#02x}", op);
+            //println!("{:#02x}", op);
             match (self.rom[cycle as usize] & 0xF0)>>4{
                 0x0 => {cycle += 1}, // NOP
                 0x1 => {
@@ -232,7 +232,9 @@ impl CPU{
                 },
                 _=>{panic!()}
             };
+            println!("{:#02x}", self.pc);
         }
+
     }
 
     fn op_jcn(&mut self, instr: u16){ // This is a 2 word instruction, hence u16 instead of u8
@@ -350,12 +352,18 @@ impl CPU{
         let index_addr = words[0] & 0xF;
 
         if self.ixr[index_addr as usize] < 15{
-            self.ixr[index_addr as usize] = self.ixr[index_addr as usize]+1;
+            self.ixr[index_addr as usize] += 1;
         } else {
             self.ixr[index_addr as usize] = 0;
         }
-
-        self.pc = words[1].into();
+        
+        if self.ixr[index_addr as usize] != 0{
+            self.pc = words[1].into();
+            println!("{:#0b}", words[1]);
+        } else {
+            self.pc += 1;
+        }
+        
     }
 
     fn op_add(&mut self, instr:u8){
@@ -618,7 +626,7 @@ impl CPU{
     fn op_wr1(&mut self){
         // Write contents of accumulator to selected ram bank ram status character 1
         // I need to check if this works
-        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+0) as usize] = self.acc;
+        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+1) as usize] = self.acc;
         self.pc += 1;
 
     }
@@ -626,7 +634,7 @@ impl CPU{
     fn op_wr2(&mut self){
         // Write contents of accumulator to selected ram bank ram status character 2
         // I need to check if this works
-        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+0) as usize] = self.acc;
+        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+2) as usize] = self.acc;
         self.pc += 1;
 
     }
@@ -634,7 +642,7 @@ impl CPU{
     fn op_wr3(&mut self){
         // Write contents of accumulator to selected ram bank ram status character 3
         // I need to check if this works
-        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+0) as usize] = self.acc;
+        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+3) as usize] = self.acc;
         self.pc += 1;
     
     }

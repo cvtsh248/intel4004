@@ -25,7 +25,7 @@ fn main() {
 
     cpu.rom = load_bin("programs/bin/test.bin");
 
-    cpu.execute(5);
-    println!("{:?}",cpu.ram_d);
+    cpu.execute(100);
+    println!("{:?}",cpu.ram_s);
 
 }
