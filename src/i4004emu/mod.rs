@@ -2,11 +2,12 @@
 #[derive(Debug)]
 pub struct CPU{ // we only have u8, u16, u32, u64, u128 to work with so the closest match will have to do
     pub ixr: [u8; 16], // Index registers consist of 16 registers of 4 bits each
-    pub rom: [u8; 4096], // ROM consists of 4096 8-bit words (32768 bits total), 16 pages of 256 bits
-    pub rom_io: u8, // ROM IO line
-    pub ram_d: [u8; 1024], // RAM Data "characters", consists of 1024 4-bit data "characters"
-    pub ram_s: [u8; 256], // RAM Status "characters", consists of 256 4-bit status "characters"
-    pub ram_o: [u8; 16], // RAM Output
+    pub rom: [u8; 4096], // ROM consists of 4096 8-bit words (32768 bits total), 16 pages of 256 bits (16 rom chips)
+    pub rom_io: [u8; 16], // ROM IO line
+    pub rom_page: u16, // ROM Page
+    pub ram_d: [u8; 1024], // RAM Data "characters", consists of 1024 4-bit data "characters" (256 data characters per bank)
+    pub ram_s: [u8; 256], // RAM Status "characters", consists of 256 4-bit status "characters" (64 status characters per bank)
+    pub ram_o: [u8; 8], // RAM Output
     pub ram_bank: u8, // RAM Bank selection (Each 4002 chip has 4 Banks, which have 4 chips, which have 4 "registers" of 16 bits)
     pub ram_addr: u8, // RAM Address register
     pub pc: u16, // 12-bit program counter
@@ -28,7 +29,7 @@ impl CPU{
             let op = self.rom[cycle as usize];
             // let op_instr_only = (self.rom[cycle as usize] & 0xF0)>>4;
             // let op_last_four = self.rom[cycle as usize] & 0xF;
-            
+            println!("{:#02x}", op);
             match (self.rom[cycle as usize] & 0xF0)>>4{
                 0x0 => {cycle += 1}, // NOP
                 0x1 => {
@@ -159,6 +160,76 @@ impl CPU{
                         _=>{panic!()}
                     }
                 }
+                0xE => {
+                    match self.rom[cycle as usize] & 0xF{
+                        0x0 => {
+                            self.op_wrm();
+                            cycle += 1;
+                        },
+                        0x1 => {
+                            self.op_wmp();
+                            cycle += 1;
+                        },
+                        0x2 => {
+                            self.op_wrr();
+                            cycle += 1;
+                        },
+                        0x3 => {
+                            self.op_wpm(); // Not implemented yet
+                            cycle += 1;
+                        },
+                        0x4 => {
+                            self.op_wr0(); 
+                            cycle += 1;
+                        },
+                        0x5 => {
+                            self.op_wr1(); 
+                            cycle += 1;
+                        },
+                        0x6 => {
+                            self.op_wr2(); 
+                            cycle += 1;
+                        },
+                        0x7 => {
+                            self.op_wr3(); 
+                            cycle += 1;
+                        },
+                        0x8 => {
+                            self.op_sbm(); 
+                            cycle += 1;
+                        },
+                        0x9 => {
+                            self.op_rdm(); 
+                            cycle += 1;
+                        },
+                        0xA => {
+                            self.op_rdr(); 
+                            cycle += 1;
+                        },
+                        0xB => {
+                            self.op_adm(); 
+                            cycle += 1;
+                        },
+                        0xC => {
+                            self.op_rd0(); 
+                            cycle += 1;
+                        },
+                        0xD => {
+                            self.op_rd1(); 
+                            cycle += 1;
+                        },
+                        0xE => {
+                            self.op_rd2(); 
+                            cycle += 1;
+                        },
+                        0xF => {
+                            self.op_rd3(); 
+                            cycle += 1;
+                        },
+                        _=>{panic!()}
+                    }
+
+                },
                 _=>{panic!()}
             };
         }
@@ -189,8 +260,6 @@ impl CPU{
         // In the first word, the last three bytes (exluding the tailing 0) refers to the index register pair in which the data is to be stored
         let words = instr.to_ne_bytes();
         let index_reg_pair = words[0] & 0xE;
-        
-        println!("{}",words[1]);
 
         self.ixr[index_reg_pair as usize] = (words[1] & 0xF0)>>4;
         self.ixr[(index_reg_pair+1) as usize] = words[1] & 0x0F;
@@ -204,18 +273,20 @@ impl CPU{
         // ROM[<Address from index reg pair 0>] is copied to index pair register number supplied
         
         let index_reg_pair = instr & 0xE;
-        let page_num = self.pc/255; 
-        let ixr_val_u16: u16 = self.ixr[0].into();
+        let page_num = (self.pc+1)/256; 
+        // let ixr_val_u16: u16 = self.ixr[0].into();
+
+        self.rom_page = page_num;
 
         if (self.pc+1) % 256 == 0 && self.pc != 0{
-            let rom_addr: u16 = (page_num+1)*255 + ixr_val_u16;
+            let rom_addr: u16 = (page_num+1)*255 + (self.ixr[0] as u16);
 
             self.ixr[index_reg_pair as usize] = (self.rom[rom_addr as usize] & 0xF0)>>4;
             self.ixr[(index_reg_pair+1) as usize] = self.rom[rom_addr as usize] & 0x0F;
             
         } else {
 
-            let rom_addr: u16 = page_num*255 + ixr_val_u16;
+            let rom_addr: u16 = page_num*255 + (self.ixr[0] as u16);
 
             self.ixr[index_reg_pair as usize] = (self.rom[rom_addr as usize] & 0xF0)>>4;
             self.ixr[(index_reg_pair+1) as usize] = self.rom[rom_addr as usize] & 0x0F;
@@ -229,7 +300,7 @@ impl CPU{
         // Jump indirect, to address stored in index registers
         let index_reg_pair = instr & 0xE;
         let page_num: u16 = self.pc/255;
-        let pc_out: u16 = ((self.ixr[index_reg_pair as usize])<<4 & self.ixr[(index_reg_pair+1) as usize]).into();
+        let pc_out: u16 = ((self.ixr[index_reg_pair as usize])<<4 | self.ixr[(index_reg_pair+1) as usize]).into();
 
         if self.pc % 255 == 0{
             self.pc = pc_out+(page_num+1)*255;
@@ -506,13 +577,16 @@ impl CPU{
     fn op_src(&mut self, instr:u8){
         // Select RAM address
         let index_reg_pair = instr & 0xE;
-        self.ram_addr = (self.ixr[index_reg_pair as usize])<<4 & self.ixr[(index_reg_pair+1) as usize];
+        self.ram_addr = (self.ixr[(index_reg_pair) as usize])<<4 | self.ixr[(index_reg_pair+1) as usize];
         self.pc += 1;
     }
 
     fn op_wrm(&mut self){
         // Write accumulator to ram address previously selected using src
-        self.ram_d[self.ram_addr as usize] = self.acc;
+        // let ram_addr_u16: u16 = self.ram_addr.into();
+        // let ram_bank_u16: u16 = self.ram_bank.into();
+        let addr = (self.ram_addr as u16) + (self.ram_bank as u16)*256;
+        self.ram_d[addr as usize] = self.acc;
         self.pc += 1;
     }
 
@@ -524,7 +598,7 @@ impl CPU{
 
     fn op_wrr(&mut self){
         // Write accumulator contents to previously selected rom io
-        self.rom_io = self.acc;
+        self.rom_io[self.rom_page as usize] = self.acc;
         self.pc += 1;
     }
 
@@ -536,7 +610,7 @@ impl CPU{
     fn op_wr0(&mut self){
         // Write contents of accumulator to selected ram bank ram status character 0
         // I need to check if this works
-        self.ram_s[(((self.ram_addr+1)/16)+0) as usize] = self.acc;
+        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+0) as usize] = self.acc;
         self.pc += 1;
 
     }
@@ -544,7 +618,7 @@ impl CPU{
     fn op_wr1(&mut self){
         // Write contents of accumulator to selected ram bank ram status character 1
         // I need to check if this works
-        self.ram_s[(((self.ram_addr+1)/16)+1) as usize] = self.acc;
+        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+0) as usize] = self.acc;
         self.pc += 1;
 
     }
@@ -552,7 +626,7 @@ impl CPU{
     fn op_wr2(&mut self){
         // Write contents of accumulator to selected ram bank ram status character 2
         // I need to check if this works
-        self.ram_s[(((self.ram_addr+1)/16)+2) as usize] = self.acc;
+        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+0) as usize] = self.acc;
         self.pc += 1;
 
     }
@@ -560,8 +634,83 @@ impl CPU{
     fn op_wr3(&mut self){
         // Write contents of accumulator to selected ram bank ram status character 3
         // I need to check if this works
-        self.ram_s[(((self.ram_addr+1)/16)+3) as usize] = self.acc;
+        self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+0) as usize] = self.acc;
+        self.pc += 1;
+    
+    }
+
+    fn op_sbm(&mut self){
+        // Subtract previously selected RAM address's data from accumulator
+        let addr = (self.ram_addr as u16) + (self.ram_bank as u16)*256;
+        let result = self.acc - self.ram_d[addr as usize];
+
+        if result <= 15 && result > 0{
+            self.acc = result;
+            self.carry = 1;
+        } else {
+            self.acc = 0;
+            self.carry = 0;
+            
+        }
+
+        self.pc += 1;
+    }
+
+    fn op_rdm(&mut self){
+        // Read RAM into accumulator
+        // let ram_addr_u16: u16 = self.ram_addr.into();
+        // let ram_bank_u16: u16 = self.ram_bank.into();
+        let addr = (self.ram_addr as u16) + (self.ram_bank as u16)*256;
+
+        self.acc = self.ram_d[addr as usize];
         self.pc += 1;
 
+    }
+
+    fn op_rdr(&mut self){
+        // Copy contents of selected rom input port into accumulator
+        self.acc = self.rom_io[self.rom_page as usize];
+        self.pc += 1;
+    }
+
+    fn op_adm(&mut self){
+        // Add selected ram character to accumulator
+        let addr = (self.ram_addr as u16) + (self.ram_bank as u16)*256;
+        let result = self.acc + self.ram_d[addr as usize];
+
+        if result <= 15 {
+            self.acc = result;
+            self.carry = 0;
+        } else {
+            self.acc = 0;
+            self.carry = 1;
+        }
+
+        self.pc += 1;
+
+    }
+
+    fn op_rd0(&mut self){
+        // Read selected ram status character into accumulator
+        self.acc = self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+0) as usize];
+        self.pc += 1;
+    }
+
+    fn op_rd1(&mut self){
+        // Read selected ram status character into accumulator
+        self.acc = self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+1) as usize];
+        self.pc += 1;
+    }
+
+    fn op_rd2(&mut self){
+        // Read selected ram status character into accumulator
+        self.acc = self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+2) as usize];
+        self.pc += 1;
+    }
+
+    fn op_rd3(&mut self){
+        // Read selected ram status character into accumulator
+        self.acc = self.ram_s[(((self.ram_addr+1)/16)+((self.ram_bank)*64)+3) as usize];
+        self.pc += 1;
     }
 }
