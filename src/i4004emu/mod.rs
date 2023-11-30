@@ -25,11 +25,9 @@ impl CPU{
         // Todo rest
         let mut cycle = 0;
 
-        while cycle < max_cycle_count{
+        while cycle <= max_cycle_count{
             let op = self.rom[cycle as usize];
-            // let op_instr_only = (self.rom[cycle as usize] & 0xF0)>>4;
-            // let op_last_four = self.rom[cycle as usize] & 0xF;
-            //println!("{:#02x}", op);
+
             match (self.rom[cycle as usize] & 0xF0)>>4{
                 0x0 => {cycle += 1}, // NOP
                 0x1 => {
@@ -359,7 +357,6 @@ impl CPU{
         
         if self.ixr[index_addr as usize] != 0{
             self.pc = words[1].into();
-            println!("{:#0b}", words[1]);
         } else {
             self.pc += 1;
         }

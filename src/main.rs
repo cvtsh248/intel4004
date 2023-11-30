@@ -23,9 +23,13 @@ fn main() {
 
     };
 
-    cpu.rom = load_bin("programs/bin/test.bin");
+    let conf = fileio::load_config().expect("Couldn't load Config settings.toml");
 
-    cpu.execute(100);
+    println!("Intel 4004 Emulator");
+
+    cpu.rom = load_bin(&conf.config.filepath);
+
+    cpu.execute(conf.config.maxcycles);
     println!("{:?}",cpu.ram_s);
 
 }

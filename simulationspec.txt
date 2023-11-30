@@ -1,3 +1,0 @@
-- Simulate an instruction cycle level (10.8 microseconds)
-- Work with opcodes
-- Simulate components

@@ -1,5 +1,25 @@
 use std::fs;
 use regex::Regex;
+use serde::{Serialize, Deserialize};
+use config_file::FromConfigFile;
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct Data{
+    pub config: Config,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct Config{
+    pub step: bool,
+    pub filepath: String,
+    pub maxcycles: i32,
+    pub outputpath: String
+}
+
+pub fn load_config() -> Result<Data, config_file::ConfigFileError> {
+    let cfg: Result<Data, config_file::ConfigFileError> = Data::from_config_file("config/settings.toml");
+    cfg
+}
 
 pub fn load_bin(filepath: &str) -> [u8; 4096]{
     // Loads a file and returns it as an array
@@ -21,3 +41,4 @@ pub fn load_bin(filepath: &str) -> [u8; 4096]{
 
     output
 }
+
