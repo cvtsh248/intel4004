@@ -1,5 +1,5 @@
 [config]
 step=false
 filepath="programs/bin/test.bin"
-maxcycles=30
+maxcycles=10
 outputpath="simout"

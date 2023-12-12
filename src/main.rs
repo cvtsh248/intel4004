@@ -1,5 +1,3 @@
-use crate::fileio::load_bin;
-
 mod i4004emu;
 mod fileio;
 
@@ -19,7 +17,8 @@ fn main() {
         stack_ptr: 0, 
         acc: 0, 
         carry: 0, 
-        test: 0
+        test: 0,
+        cycle: 0
 
     };
 
@@ -27,9 +26,11 @@ fn main() {
 
     println!("Intel 4004 Emulator");
 
-    cpu.rom = load_bin(&conf.config.filepath);
+    cpu.rom = fileio::load_bin(&conf.config.filepath);
 
-    cpu.execute(conf.config.maxcycles);
-    println!("{:?}",cpu.ram_s);
+    cpu.execute(conf.config.maxcycles, &conf.config.outputpath);
+
+    println!("Done.")
+    // println!("{:?}",cpu.ram_d);
 
 }

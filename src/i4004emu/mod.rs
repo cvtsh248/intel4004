@@ -1,4 +1,6 @@
 // Technically this processor is big endian, but I'm sticking to little endian cause it makes no difference at the end of the day
+use crate::fileio::SaveData;
+
 #[derive(Debug)]
 pub struct CPU{ // we only have u8, u16, u32, u64, u128 to work with so the closest match will have to do
     pub ixr: [u8; 16], // Index registers consist of 16 registers of 4 bits each
@@ -15,11 +17,12 @@ pub struct CPU{ // we only have u8, u16, u32, u64, u128 to work with so the clos
     pub stack_ptr: u8, // 4-bit Stack pointer
     pub acc: u8, // 4-bit accumulator
     pub carry: u8, // carry bit
-    pub test: u8 // Test pin
+    pub test: u8, // Test pin
+    pub cycle: i32
     
 }
 impl CPU{
-    pub fn execute(&mut self, max_cycle_count: i32){
+    pub fn execute(&mut self, max_cycle_count: i32, output_destination: &str){
         // Initialise
         self.pc = 0;
         // Todo rest
@@ -230,7 +233,9 @@ impl CPU{
                 },
                 _=>{panic!()}
             };
-            println!("{:#02x}", self.pc);
+            self.cycle = cycle;
+            println!("Executing cycle #{:?}, PC content: {:#02x}", self.cycle, self.pc);
+            SaveData::save_struct(self, output_destination);
         }
 
     }
